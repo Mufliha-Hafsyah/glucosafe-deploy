@@ -134,26 +134,37 @@ def home():
 @app.route('/predict', methods=['POST'])
 def predict():
     try:
-        # Ambil data dari form berdasarkan nama field
         form_data = request.form
         
-        # Susun array sesuai urutan fitur yang disimpan di json
-        input_data = []
+        # 1. Susun data mentah sesuai urutan fitur (15 fitur)
+        raw_input = []
         for feature in feature_names:
-            val = float(form_data[feature])
-            input_data.append(val)
-            
-        # Ubah ke numpy array dan lakukan scaling
-        input_array = np.array([input_data], dtype=np.float32)
-        scaled_data = scaler.transform(input_array).astype(np.float32)
+            raw_input.append(float(form_data[feature]))
         
-        # Prediksi dengan TFLite
-        interpreter.set_tensor(input_details[0]['index'], scaled_data)
+        # 2. Ambil indeks untuk 5 fitur yang di-scaling
+        # Kolom: BMI, Age, GenHlth, MentHlth, PhysHlth
+        num_cols = ["BMI", "Age", "GenHlth", "MentHlth", "PhysHlth"]
+        
+        # Siapkan array final
+        final_data = np.array([raw_input], dtype=np.float32)
+        
+        # Cari posisi indeks dari num_cols di dalam feature_names
+        num_indices = [feature_names.index(col) for col in num_cols]
+        
+        # 3. Ambil nilai 5 kolom tersebut, lalu scaling
+        values_to_scale = final_data[:, num_indices]
+        scaled_values = scaler.transform(values_to_scale)
+        
+        # 4. Kembalikan nilai yang sudah di-scale ke posisi aslinya
+        final_data[:, num_indices] = scaled_values
+        
+        # 5. Prediksi dengan TFLite
+        interpreter.set_tensor(input_details[0]['index'], final_data)
         interpreter.invoke()
         prediction = interpreter.get_tensor(output_details[0]['index'])[0][0]
         
         # Hitung persentase
-        prob_percent = round(prediction * 100, 1)
+        prob_percent = round(float(prediction) * 100, 1)
         
         if prediction > 0.5:
             result_text = f"{prob_percent}% (Risiko Tinggi)"
