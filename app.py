@@ -168,7 +168,7 @@ def predict():
         interpreter.invoke()
         prediction = interpreter.get_tensor(output_details[0]['index'])[0][0]
         
-        # 7. Logika Hasil Prediksi
+        # 7. Logika Hasil Prediksi (Murni Peluang Diabetes)
         prob_diabetes = float(prediction) * 100
         prob_diabetes_percent = round(prob_diabetes, 1)
         
@@ -176,8 +176,7 @@ def predict():
             result_text = f"{prob_diabetes_percent}% (Risiko Tinggi)"
             color = "bg-red"
         else:
-            prob_sehat = 100 - prob_diabetes
-            result_text = f"{round(prob_sehat, 1)}% (Risiko Rendah)"
+            result_text = f"{prob_diabetes_percent}% (Risiko Rendah)"
             color = "bg-green"
             
         return render_template_string(HTML_TEMPLATE, result=result_text, color=color)
