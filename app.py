@@ -51,8 +51,10 @@ HTML_TEMPLATE = """
         .btn-submit:hover { background-color: #0f766e; }
         .result { text-align: center; padding: 40px 20px; }
         .result h2 { color: #0D9488; }
-        .score { font-size: 48px; font-weight: bold; color: #0D9488; margin: 20px 0; }
+        .score { font-size: 48px; font-weight: bold; margin: 20px 0; }
         .btn-back { display: inline-block; margin-top: 20px; text-decoration: none; color: white; background-color: #0D9488; padding: 10px 20px; border-radius: 8px; }
+        .bg-red { color: #dc2626; }
+        .bg-green { color: #16a34a; }
     </style>
 </head>
 <body>
@@ -61,8 +63,12 @@ HTML_TEMPLATE = """
             <div class="header"><h1>Hasil Skrining</h1></div>
             <div class="result">
                 <h2>Risiko Diabetes Anda:</h2>
-                <div class="score">{{ result }}</div>
-                <p>{% if color == 'red' %}⚠️ Segera konsultasikan ke dokter.{% else %}✅ Tetap jaga pola hidup sehat!{% endif %}</p>
+                <div class="score {{ color }}">{{ result }}</div>
+                {% if color == 'bg-red' %}
+                    <p>⚠️ Segera konsultasikan ke dokter untuk pemeriksaan lebih lanjut.</p>
+                {% else %}
+                    <p>✅ Tetap jaga pola hidup sehat!</p>
+                {% endif %}
                 <a href="/" class="btn-back">Kembali ke Form</a>
             </div>
         {% else %}
@@ -141,42 +147,43 @@ def predict():
         for feature in feature_names:
             raw_input.append(float(form_data[feature]))
         
-        # 2. Ambil indeks untuk 5 fitur yang di-scaling
-        # Kolom: BMI, Age, GenHlth, MentHlth, PhysHlth
-        num_cols = ["BMI", "Age", "GenHlth", "MentHlth", "PhysHlth"]
-        
-        # Siapkan array final
+        # 2. Siapkan array final
         final_data = np.array([raw_input], dtype=np.float32)
+        
+        # 3. Fitur yang di-scaling (5 fitur numerik)
+        num_cols = ["BMI", "Age", "GenHlth", "MentHlth", "PhysHlth"]
         
         # Cari posisi indeks dari num_cols di dalam feature_names
         num_indices = [feature_names.index(col) for col in num_cols]
         
-        # 3. Ambil nilai 5 kolom tersebut, lalu scaling
+        # 4. Ambil nilai 5 kolom tersebut, lalu scaling
         values_to_scale = final_data[:, num_indices]
         scaled_values = scaler.transform(values_to_scale)
         
-        # 4. Kembalikan nilai yang sudah di-scale ke posisi aslinya
+        # 5. Kembalikan nilai yang sudah di-scale ke posisi aslinya
         final_data[:, num_indices] = scaled_values
         
-        # 5. Prediksi dengan TFLite
+        # 6. Prediksi dengan TFLite
         interpreter.set_tensor(input_details[0]['index'], final_data)
         interpreter.invoke()
         prediction = interpreter.get_tensor(output_details[0]['index'])[0][0]
         
-        # Hitung persentase
-        prob_percent = round(float(prediction) * 100, 1)
+        # 7. Logika Hasil Prediksi
+        prob_diabetes = float(prediction) * 100
+        prob_diabetes_percent = round(prob_diabetes, 1)
         
         if prediction > 0.5:
-            result_text = f"{prob_percent}% (Risiko Tinggi)"
-            color = "red"
+            result_text = f"{prob_diabetes_percent}% (Risiko Tinggi)"
+            color = "bg-red"
         else:
-            result_text = f"{round(100 - prob_percent, 1)}% (Risiko Rendah)"
-            color = "green"
+            prob_sehat = 100 - prob_diabetes
+            result_text = f"{round(prob_sehat, 1)}% (Risiko Rendah)"
+            color = "bg-green"
             
         return render_template_string(HTML_TEMPLATE, result=result_text, color=color)
     except Exception as e:
         return f"Error: {e}"
-        
+
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port)
